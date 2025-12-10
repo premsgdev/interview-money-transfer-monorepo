@@ -14,7 +14,8 @@ class AuthenticationService
         private UserRepository $userRepository,
         private UserPasswordHasherInterface $passwordHasher,
         private JWTTokenManagerInterface $jwtManager,
-    ) {}
+    ) {
+    }
 
     /**
      * @throws AuthenticationException if credentials invalid

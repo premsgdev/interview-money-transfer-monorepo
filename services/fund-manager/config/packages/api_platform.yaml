@@ -1,12 +1,10 @@
 api_platform:
   title: 'Fund Manager API'
-  description: 'Service responsible for accounts and fund transfers'
+  description: 'Accounts & transfer API'
   version: '1.0.0'
-
   mapping:
     paths:
       - '%kernel.project_dir%/src/Entity'
-
   enable_swagger: true
   enable_swagger_ui: true
   enable_entrypoint: true

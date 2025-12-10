@@ -8,5 +8,6 @@ final class UserUpdatedEvent
         public string $userUuid,
         public string $email,
         public array $roles = [],
-    ) {}
+    ) {
+    }
 }

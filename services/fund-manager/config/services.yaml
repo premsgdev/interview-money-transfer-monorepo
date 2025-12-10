@@ -9,3 +9,8 @@ services:
       - '../src/Kernel.php'
 
   App\MessageSerializer\UserMessageSerializer: ~
+
+  App\Doctrine\AccountOwnerExtension:
+        tags:
+            - { name: 'api_platform.doctrine.orm.query_extension.collection' }
+            - { name: 'api_platform.doctrine.orm.query_extension.item' }

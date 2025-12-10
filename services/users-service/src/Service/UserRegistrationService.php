@@ -3,12 +3,11 @@
 namespace App\Service;
 
 use App\Entity\User;
-use App\Message\UserUpdateMessage;
+use App\Factory\UserMessageFactory;
 use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
-use App\Factory\UserMessageFactory;
 
 class UserRegistrationService
 {
@@ -18,7 +17,8 @@ class UserRegistrationService
         private UserPasswordHasherInterface $passwordHasher,
         private MessageBusInterface $bus,
         private UserMessageFactory $messageFactory,
-    ) {}
+    ) {
+    }
 
     /**
      * @throws \DomainException if email already exists

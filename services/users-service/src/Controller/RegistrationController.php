@@ -12,7 +12,8 @@ class RegistrationController extends AbstractController
 {
     public function __construct(
         private UserRegistrationService $registrationService,
-    ) {}
+    ) {
+    }
 
     #[Route('/api/register', name: 'api_register', methods: ['POST'])]
     public function register(Request $request): JsonResponse

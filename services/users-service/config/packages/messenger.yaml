@@ -1,15 +1,15 @@
 framework:
   messenger:
     transports:
-
-      user_update:
+      user_events:
         dsn: '%env(MESSENGER_TRANSPORT_DSN)%'
         serializer: messenger.transport.symfony_serializer
         options:
           exchange:
-            name: user_update        
+            name: user_events
           queues:
-            acc_user_update: ~ 
+            user_events: ~
 
     routing:
-      App\Message\UserUpdateMessage: user_update
+      App\Message\UserUpdatedEvent: user_events
+      App\Message\UserDeletedEvent: user_events

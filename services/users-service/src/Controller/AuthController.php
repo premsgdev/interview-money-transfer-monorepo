@@ -13,7 +13,8 @@ class AuthController extends AbstractController
 {
     public function __construct(
         private AuthenticationService $authService,
-    ) {}
+    ) {
+    }
 
     #[Route('/api/login', name: 'api_login', methods: ['POST'])]
     public function login(Request $request): JsonResponse

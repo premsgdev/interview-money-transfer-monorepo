@@ -12,7 +12,8 @@ class UserUpdatedEventHandler
 {
     public function __construct(
         private EntityManagerInterface $em,
-    ) {}
+    ) {
+    }
 
     public function __invoke(UserUpdatedEvent $event): void
     {
