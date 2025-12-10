@@ -1,0 +1,50 @@
+version: "3.8"
+services:
+  rabbit:
+    image: rabbitmq:3.11-management
+    container_name: money-rabbit
+    ports:
+      - "15672:15672" # management UI
+      - "5672:5672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    healthcheck:
+      test: ["CMD", "rabbitmqctl", "status"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  redis:
+    image: redis:7
+    container_name: money-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  mysql:
+    image: mysql:8.0
+    container_name: money-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: users_db   # initial DB (we'll create accounts_db via init script)
+      MYSQL_USER: user
+      MYSQL_PASSWORD: pass
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./data/mysql:/var/lib/mysql
+      - ./infra/mysql-init:/docker-entrypoint-initdb.d # optional init scripts
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+networks:
+  money-net:
+    driver: bridge

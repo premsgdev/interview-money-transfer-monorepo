@@ -1,0 +1,10 @@
+framework:
+  messenger:
+    transports:
+      user_update:
+        dsn: '%env(MESSENGER_TRANSPORT_DSN)%'
+        serializer: App\MessageSerializer\UserMessageSerializer
+
+    routing:
+      App\Message\UserUpdatedEvent: user_update
+      App\Message\UserDeletedEvent: user_update

@@ -1,0 +1,43 @@
+# config/packages/security.yaml
+security:
+  password_hashers:
+    App\Entity\User:
+      algorithm: auto
+
+  role_hierarchy:
+    ROLE_ADMIN: [ROLE_USER]
+
+  providers:
+    users_in_db:
+      entity:
+        class: App\Entity\User
+        property: email
+
+  firewalls:
+    dev:
+      pattern: ^/(_(profiler|wdt)|css|images|js)/
+      security: false
+
+    register:
+      pattern: ^/api/register
+      security: false
+
+    login:
+      pattern: ^/api/login
+      stateless: true
+      json_login:
+        check_path: /api/login
+        username_path: email
+        password_path: password
+
+    api:
+      pattern: ^/api
+      stateless: true
+      provider: users_in_db
+      jwt: ~
+
+  access_control:
+    - { path: ^/api/register, roles: PUBLIC_ACCESS }
+    - { path: ^/api/login, roles: PUBLIC_ACCESS }
+    - { path: ^/api/docs, roles: PUBLIC_ACCESS }
+    - { path: ^/api, roles: IS_AUTHENTICATED_FULLY }

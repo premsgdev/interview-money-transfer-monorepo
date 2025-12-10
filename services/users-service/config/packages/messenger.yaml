@@ -1,0 +1,15 @@
+framework:
+  messenger:
+    transports:
+
+      user_update:
+        dsn: '%env(MESSENGER_TRANSPORT_DSN)%'
+        serializer: messenger.transport.symfony_serializer
+        options:
+          exchange:
+            name: user_update        
+          queues:
+            acc_user_update: ~ 
+
+    routing:
+      App\Message\UserUpdateMessage: user_update

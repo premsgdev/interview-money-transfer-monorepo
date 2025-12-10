@@ -1,0 +1,13 @@
+api_platform:
+  title: 'Users Service API'
+  description: 'User management & authentication service'
+  version: '1.0.0'
+
+  mapping:
+    paths:
+      - '%kernel.project_dir%/src/Entity'
+
+  enable_swagger: true
+  enable_swagger_ui: true
+  enable_entrypoint: true
+  enable_docs: true

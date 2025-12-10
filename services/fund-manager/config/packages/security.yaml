@@ -1,0 +1,32 @@
+security:
+  password_hashers:
+    # if we ever store a "local user" entity
+    App\Entity\User:
+      algorithm: auto
+
+  providers:
+    # We only need a dummy provider for JWT; fund-manager trusts the token
+    app_dummy_provider:
+      memory: ~
+      
+  firewalls:
+    dev:
+      pattern: ^/(_(profiler|wdt)|css|images|js)/
+      security: false
+
+    # Swagger docs should be public
+    docs:
+      pattern: ^/api/docs
+      security: false
+      stateless: true
+
+    # Main API – protected by JWT
+    api:
+      pattern: ^/api
+      stateless: true
+      provider: app_dummy_provider
+      jwt: ~   # Lexik JWT authenticator
+
+  access_control:
+    - { path: ^/api/docs, roles: PUBLIC_ACCESS }
+    - { path: ^/api, roles: IS_AUTHENTICATED_FULLY }

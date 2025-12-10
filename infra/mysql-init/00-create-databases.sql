@@ -1,0 +1,8 @@
+CREATE DATABASE IF NOT EXISTS accounts_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+CREATE USER IF NOT EXISTS 'acc'@'%' IDENTIFIED BY 'pass';
+GRANT ALL PRIVILEGES ON accounts_db.* TO 'acc'@'%';
+
+CREATE USER IF NOT EXISTS 'user'@'%' IDENTIFIED BY 'pass';
+GRANT ALL PRIVILEGES ON users_db.* TO 'user'@'%';
+FLUSH PRIVILEGES;

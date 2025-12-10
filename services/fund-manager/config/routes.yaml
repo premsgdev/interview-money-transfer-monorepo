@@ -1,0 +1,3 @@
+services/users-service/config/jwtcontrollers:
+  resource: ../src/Controller/
+  type: attribute
