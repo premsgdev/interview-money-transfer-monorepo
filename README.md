@@ -76,9 +76,9 @@ API --> TRANSFER --> DB
 make infra-up
 ```
 Starts:
-    - MySQL
-    - Redis
-    - RabbitMQ
+    * MySQL
+    * Redis
+    * RabbitMQ
 
 ### Start the users-service
 
@@ -102,6 +102,43 @@ cd services/fund-manager
 php bin/console messenger:consume user_events -vv
 ```
 This keeps the user projection in sync with users-service.
+
+## Also these services can be start in its own Docker containers
+### Start users-service in its own Docker container
+
+```bash
+make start-users-local
+```
+This will:
+  * Install vendor dependencies via Composer (inside a temp container)
+  * Mount your local services/users-service folder
+  * Start a PHP local server inside the container
+
+Expose the service at:
+  * 👉 http://127.0.0.1:8001
+
+You can now hit:
+  * POST /api/register
+  * POST /api/login
+  * GET /api/docs (Swagger UI)
+
+### Start fund-manager in its own Docker container
+```
+make start-fund-local
+```
+This will:
+  * Install dependencies inside the container
+  * Mount your local services/fund-manager folder
+  * Start PHP server inside container
+
+Expose the service at:
+  * 👉 http://127.0.0.1:8002
+
+Available endpoints include:
+  * POST /api/accounts
+  * GET /api/accounts
+  * POST /api/transfers
+  * GET /api/docs
 
 ### Users-service Swagger
 
@@ -130,6 +167,39 @@ vendor/bin/simple-phpunit
 
 ## 📡 API Workflows
 Below is the complete flow of how the frontend or API client interacts with both microservices.
+
+```mermaid
+flowchart LR
+  subgraph Users-Service
+    US[Users API<br/>http://127.0.0.1:8001]
+  end
+
+  subgraph Infra
+    MQ[RabbitMQ]
+    REDIS[Redis]
+    DB[MySQL]
+  end
+
+  subgraph Fund-Manager
+    FM[Fund-Manager API<br/>http://127.0.0.1:8002]
+    PROJ[User Projection]
+    ACC[Accounts DB Tables]
+    TRANS[Transfer Service]
+  end
+
+  Client -->|Register / Login| US
+  US -->|UserUpdatedEvent| MQ
+  MQ -->|Consume| PROJ
+  PROJ --> DB
+  Client -->|Create / List Accounts| FM
+  FM --> PROJ
+  FM -->|Account CRUD| ACC
+  Client -->|POST /api/transfers| FM
+  FM -->|idempotency| REDIS
+  FM -->|transaction| TRANS
+  FM -->|audit| TRANS
+  TRANS -->|save| DB
+```
 
 ### 🧩 1. Authentication & User Management (users-service)
 Base URL: http://127.0.0.1:8001

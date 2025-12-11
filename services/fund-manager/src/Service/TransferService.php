@@ -26,7 +26,6 @@ class TransferService
      */
     public function transfer(TransferRequest $dto, string $initiatorEmail, ?string $idempotencyKey = null): Transfer
     {
-        // Idempotency
         if ($idempotencyKey) {
             $cacheKey = 'transfer_idem_'.$idempotencyKey;
             $alreadyProcessed = $this->cache->get($cacheKey, function (ItemInterface $item) {
@@ -68,7 +67,6 @@ class TransferService
             $initiatorUser,
             $idempotencyKey
         ) {
-            // Load and lock accounts
             /** @var Account|null $from */
             $from = $accountRepo->findOneBy(['accountUuid' => $dto->fromAccountUuid]);
             /** @var Account|null $to */
@@ -78,7 +76,6 @@ class TransferService
                 throw new \DomainException('One or both accounts not found');
             }
 
-            // Pessimistic locks
             $this->em->lock($from, LockMode::PESSIMISTIC_WRITE);
             $this->em->lock($to, LockMode::PESSIMISTIC_WRITE);
 
@@ -86,7 +83,6 @@ class TransferService
                 throw new \DomainException('Currency mismatch between accounts and transfer request');
             }
 
-            // Ownership: initiator must own "from" account
             if ($from->getUser()->getUuid() !== $initiatorUser->getUuid()) {
                 throw new \DomainException('You are not allowed to transfer funds from this account');
             }
@@ -95,13 +91,11 @@ class TransferService
                 throw new \DomainException('Insufficient balance');
             }
 
-            // Apply balances
             $from->setBalance(number_format((float) $from->getBalance() - (float) $amount, 2, '.', ''))
                  ->touch();
             $to->setBalance(number_format((float) $to->getBalance() + (float) $amount, 2, '.', ''))
                ->touch();
 
-            // Create transfer record
             $transfer = new Transfer(
                 $from,
                 $to,
@@ -113,7 +107,6 @@ class TransferService
             $this->em->persist($transfer);
             $this->em->flush();
 
-            // Mark idempotency key as used
             if ($idempotencyKey) {
                 $cacheKey = 'transfer_idem_'.$idempotencyKey;
                 $this->cache->delete($cacheKey);
