@@ -52,14 +52,12 @@ class AccountOwnerExtension implements QueryCollectionExtensionInterface, QueryI
 
         $userPrincipal = $this->security->getUser();
         if (!$userPrincipal) {
-            // Anonymous; API Platform security should already block, but we don't filter further
             return;
         }
 
         $email = $userPrincipal->getUserIdentifier();
         $rootAlias = $queryBuilder->getRootAliases()[0];
 
-        // Join owner user_projection and restrict to current user
         $queryBuilder
             ->join($rootAlias.'.user', 'u')
             ->andWhere('u.email = :current_email')

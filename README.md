@@ -48,6 +48,108 @@ This service is part of the **Money Transfer Monorepo** and works together with 
 * Clean test isolation via dedicated test DB
 
 ---
+## 🏗️ Architecture Overview
+This system is built using a microservice architecture consisting of two independent Symfony applications:
+### 1. Users-Service (Identity & Authentication)
+Responsible for:
+  * User registration & login
+  * Password hashing & authentication
+  * JWT token issuance
+  * Emitting user events (create/update/delete) to RabbitMQ
+
+It owns the concept of a “user” and acts as the source of truth for identity.
+### 2. Fund-Manager Service (Accounts & Money Transfers)
+Responsible for:
+ * Managing financial accounts
+ * Executing safe, ACID-compliant fund transfers
+ * Enforcing user ownership and access control using JWT
+ * Maintaining a local projection of users (synced from RabbitMQ events)
+ * Implementing high-performance operations using Redis for idempotency
+
+It owns all financial data, ensuring transactional integrity without relying on external services.
+
+### 🧠 Why This Architecture?
+This design wasn’t chosen arbitrarily — it aligns with real financial-sector engineering practices and demonstrates architectural maturity.
+Below are the key reasons this approach is used and valued in production systems:
+#### ✅ 1. Clear Separation of Responsibilities (Single Responsibility Principle)
+Each service focuses on one domain:
+
+| Service | Responsibility |
+| :--- | :--- |
+| **Users-Service** | Identity, credentials, authorization |
+| **Fund-Manager** | Accounts, balances, transfers |
+
+This makes the system easier to reason about, test, extend, and secure.
+
+#### ✅ 2. Event-Driven User Synchronization
+Instead of `Fund-Manager` calling `Users-Service` synchronously:
+
+* **Users-Service** publishes events (RabbitMQ)
+* **Fund-Manager** consumes events and updates a local projection
+
+This provides:
+* **Loose coupling** between services
+* **Fault tolerance** (if `Users-Service` is down, transfers still work)
+* **High performance** (no cross-service HTTP calls during critical money operations)
+* **Scalable fan-out** — more services can subscribe to user events in the future
+
+This is a modern microservice best practice.
+
+#### ✅ 3. Local User Projection in Fund-Manager
+`Fund-Manager` keeps a local table (`user_projection`) synchronized from events.
+
+**Why?**
+* Financial operations must not depend on remote services
+* Latency must be minimal under high load
+* Handling thousands of transfers per second requires local lookups only
+
+This approach mirrors event-sourcing patterns used by Stripe, Revolut, and Monzo.
+
+#### ✅ 4. RabbitMQ for Reliable Asynchronous Communication
+RabbitMQ provides:
+* Message durability
+* Guaranteed delivery
+* Retry + dead letter queues
+* Backpressure handling
+
+Essential for event-driven financial workloads.
+
+#### ✅ 5. Redis for Idempotency & High Load
+Fund transfers must be **idempotent**, or users might accidentally trigger duplicate transfers.
+Redis is used to store:
+* Idempotency keys
+* Temporary request fingerprints
+
+This prevents double-charging and ensures correctness.
+
+#### ✅ 6. Database Transaction Integrity
+`Fund-Manager` uses:
+* MySQL transactions
+* Row-level locking (`SELECT FOR UPDATE`)
+
+This prevents:
+* Race conditions
+* Double-spending
+* Dirty reads / write skew
+
+Banks use similar mechanisms.
+
+#### ✅ 7. Independent Scaling
+Each service scales based on its own bottlenecks:
+
+* **Users-service** → CPU-bound (auth hashing, login)
+* **Fund-manager** → IO & DB-bound (transactions, balance updates)
+
+This enables cost-efficient horizontal scaling.
+
+#### ✅ 8. Easy to Extend
+This architecture allows adding more microservices easily:
+
+* **Notifications Service** → subscribes to user events
+* **Ledger Service** → subscribes to transfer events
+* **Reporting Service** → consumes events for analytics
+
+Zero modifications required to existing services.
 
 ## 🧱 Architecture Diagram
 
@@ -170,35 +272,52 @@ Below is the complete flow of how the frontend or API client interacts with both
 
 ```mermaid
 flowchart LR
-  subgraph Users-Service
-    US[Users API<br/>http://127.0.0.1:8001]
+  classDef svc fill:#f8f9fb,stroke:#2b6fb3,stroke-width:1px;
+  classDef infra fill:#fff7e6,stroke:#b36b00,stroke-width:1px;
+  classDef db fill:#f0fff4,stroke:#0b7a3a,stroke-width:1px;
+  classDef client fill:#ffffff,stroke:#6b7280,stroke-width:1px,stroke-dasharray: 4 2;
+
+  Client[Client<br/>Web / Mobile / CLI]:::client
+
+  subgraph AuthBound[Users-Service]
+    direction TB
+    US_API[Users API<br/><b>Register / Login / JWT</b>]:::svc
+    US_EVENTS[Emit UserUpdatedEvent / UserDeletedEvent]:::svc
   end
 
-  subgraph Infra
-    MQ[RabbitMQ]
-    REDIS[Redis]
-    DB[MySQL]
+  subgraph Messaging[ ]
+    direction TB
+    Rabbit[RabbitMQ<br/>Exchange → Queue]:::infra
   end
 
-  subgraph Fund-Manager
-    FM[Fund-Manager API<br/>http://127.0.0.1:8002]
-    PROJ[User Projection]
-    ACC[Accounts DB Tables]
-    TRANS[Transfer Service]
+  subgraph FinanceBound[Fund-Manager]
+    direction TB
+    FM_CONSUME[Consume User Events]:::svc
+    PROJECTION[User Projection<br/>user table]:::db
+    ACCOUNTS[Accounts API<br/>API Platform]:::svc
+    TRANSFER[Transfer Engine<br/>Transactional, locks]:::svc
+    CACHE[Redis<br/>Idempotency & Cache]:::infra
+    ACCT_DB[MySQL<br/>accounts_db]:::db
   end
 
-  Client -->|Register / Login| US
-  US -->|UserUpdatedEvent| MQ
-  MQ -->|Consume| PROJ
-  PROJ --> DB
-  Client -->|Create / List Accounts| FM
-  FM --> PROJ
-  FM -->|Account CRUD| ACC
-  Client -->|POST /api/transfers| FM
-  FM -->|idempotency| REDIS
-  FM -->|transaction| TRANS
-  FM -->|audit| TRANS
-  TRANS -->|save| DB
+  %% Client interactions
+  Client -->|1. register / login| US_API
+  Client -->|2. use JWT to call| ACCOUNTS
+  Client -->|3. call transfer endpoint| TRANSFER
+
+  %% Users-service publishes events
+  US_EVENTS -->|publish:user_events| Rabbit
+
+  %% RabbitMQ -> fund-manager
+  Rabbit -->|deliver events| FM_CONSUME
+  FM_CONSUME -->|upsert| PROJECTION
+
+  %% Fund-manager internals
+  ACCOUNTS -->|create/list accounts | PROJECTION
+  TRANSFER -->|SELECT ... FOR UPDATE / COMMIT| ACCT_DB
+  TRANSFER -->|check/store idempotency key| CACHE
+  TRANSFER -->|read ownership from| PROJECTION
+  TRANSFER -->|audit / insert transfer| ACCT_DB
 ```
 
 ### 🧩 1. Authentication & User Management (users-service)
