@@ -381,3 +381,8 @@ URL: http://127.0.0.1:8002/api/accounts
 curl -X GET http://127.0.0.1:8002/api/accounts \
   -H "Authorization: Bearer <JWT_TOKEN>"
 ```
+
+## AI Tools used
+  * google.geminicodeassist 2.63
+  * Chat GPT 5.1
+### Aproximate time taken : ~ 6hrs
