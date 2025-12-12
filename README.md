@@ -386,3 +386,79 @@ curl -X GET http://127.0.0.1:8002/api/accounts \
   * google.geminicodeassist 2.63
   * Chat GPT 5.1
 ### Aproximate time taken : ~ 5hrs
+
+### Prompt used in gemini code assistant 
+
+You are an expert backend engineer and project scaffold generator. Produce a hybrid monorepo scaffold for a small event-driven microservice system called `money-transfer-monorepo`. DO NOT run commands or install dependencies — only generate files and their contents. Keep files minimal, correct, and ready to be improved. For every file output the file path followed by its full content inside triple backticks (```), so I can copy/paste files directly.
+
+High-level goals:
+- Two Symfony 7 services (PHP 8.4+):
+  1. users-service — identity, registration, login, JWT issuance, publish user events.
+  2. fund-manager — accounts, transfers, user projection, consume user events, API Platform.
+- Infrastructure via Docker Compose: RabbitMQ (management enabled), Redis, MySQL (single server with two logical DB names).
+- Symfony Messenger for events (RabbitMQ transport).
+- LexikJWTAuthenticationBundle for JWT (keys placed under config/jwt; note in comments to copy keys).
+- Redis used for idempotency (idempotency key store) and optional caching.
+- Fund transfer endpoint must be transactional (explain using SELECT FOR UPDATE) and use idempotency.
+
+General constraints & formatting:
+- Use PHP 8 typed properties and attributes where appropriate.
+- Use ApiPlatform attributes for Account resource in fund-manager.
+- Keep code short, add inline comments for TODOs and where secrets must be set.
+- Provide a simple phpunit test skeleton for fund-manager transfer flow (use JWTTokenManagerInterface to create token; mark TODOs).
+- Provide Dockerfiles for both services and a docker-compose.yml for infra.
+- Provide a Makefile at repo root with targets: infra-up, infra-down, start-users-local, start-fund-local, start-services, stop-services, migrate-users, migrate-fund, logs-users, logs-fund, clean.
+- Provide .env.example at root with example DSNs and JWT_PASSPHRASE.
+- Do NOT include vendor/ or generated composer.lock content.
+- Do not run composer install, migrations, or Docker builds — only generate files.
+
+Ports & defaults:
+- users-service → http://127.0.0.1:8001
+- fund-manager → http://127.0.0.1:8002
+- RabbitMQ management → 15672
+- Redis → 6379
+- MySQL → 3306
+
+Deliverables — files to generate (concise, valid content):
+
+1) Root:
+- README.md (brief architecture, how to run via Makefile and docker-compose)
+- docker-compose.yml (rabbitmq with management plugin, redis, mysql with init SQL to create users_db and accounts_db)
+- Makefile (targets listed above)
+- .env.example (RABBIT_DSN, REDIS_URL, USERS_DB_URL, ACCOUNTS_DB_URL, JWT_PASSPHRASE)
+
+2) services/users-service/:
+- composer.json (metadata, php constraint)
+- Dockerfile (php:8.4-cli base, installs pdo_mysql ext comment lines)
+- .env (template referencing root envs)
+- config/packages/lexik_jwt_authentication.yaml (stub with secret/public paths pointing to config/jwt)
+- config/packages/messenger.yaml (transport placeholder using %env(MESSENGER_TRANSPORT_DSN)%)
+- src/Entity/User.php (Doctrine entity with uuid, email, password, roles; Symfony validator attributes optional)
+- src/Message/UserUpdatedEvent.php (simple DTO with userUuid, email, roles)
+- src/Controller/AuthController.php (skeleton with POST /api/register and POST /api/login endpoints; comment to publish UserUpdatedEvent on creation)
+- migrations/.gitkeep
+- tests/.gitkeep
+
+3) services/fund-manager/:
+- composer.json
+- Dockerfile
+- .env
+- config/packages/api_platform.yaml (enable docs)
+- config/packages/lexik_jwt_authentication.yaml (stub, note keys must be copied from users-service)
+- config/packages/messenger.yaml (transport uses %env(MESSENGER_TRANSPORT_DSN)% and references a custom serializer optional)
+- src/Entity/UserProjection.php (uuid, email, roles, active)
+- src/Entity/Account.php (ApiResource attributes, fields: id, accountUuid, user (relation by userUuid), balance decimal, currency, createdAt; include serialization groups)
+- src/Entity/Transfer.php (transferUuid, fromAccountUuid, toAccountUuid, amount, currency, status, createdAt)
+- src/Message/UserUpdatedEvent.php (same DTO shape or mapping comment)
+- src/MessageHandler/UserUpdatedEventHandler.php (handler skeleton that upserts user projection into DB)
+- src/Service/IdempotencyService.php (stub showing Redis usage concept)
+- src/Controller/TransferController.php (POST /api/transfers skeleton showing steps: validate JWT, check idempotency key in Redis, begin transaction, SELECT FOR UPDATE both accounts, check balances, debit/credit, insert transfer row, commit, store idempotency key; add comments about retries and error handling)
+- src/Repository/AccountRepository.php (brief method findByAccountUuid)
+- tests/Functional/TransferControllerTest.php (skeleton that creates projection user + accounts in test DB, generates JWT via JWTTokenManagerInterface, posts /api/transfers, asserts response and DB balances; put TODO placeholders)
+- migrations/.gitkeep
+
+4) Example event JSON shape (as a small file or README snippet):
+```json
+{ "userUuid": "uuid", "email": "user@example.com", "roles": ["ROLE_USER"] }
+
+
